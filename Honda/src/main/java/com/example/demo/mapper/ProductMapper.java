@@ -1,6 +1,7 @@
 package com.example.demo.mapper;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
@@ -21,10 +22,13 @@ public interface ProductMapper {
 	public List<Product> selectAll();
 	
 	@Select("SELECT * FROM product WHERE id = #{id}")
-	public List<Product> selectAllById(int id);
+	public Optional<Product> selectAllById(int id);
 	
 	@Select("SELECT * FROM product WHERE name = #{name}")
 	public List<Product> selectAllByName(String name);
+	
+	@Select("SELECT COUNT(*) FROM product WHERE name = #{name}")
+	public int countByName(String name);
 	
 	@Select("SELECT * FROM product WHERE model = #{model}")
 	public List<Product> selectAllByModel(String model);

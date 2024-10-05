@@ -5,9 +5,9 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import com.example.demo.exception.ProductNotFoundException;
+import com.example.demo.exception.product.InvalidProductDataException;
+import com.example.demo.exception.product.ProductNotFoundException;
 import com.example.demo.mapper.ProductMapper;
 import com.example.demo.model.Product;
 import com.example.demo.service.ProductService;
@@ -19,9 +19,10 @@ public class ProductServiceImpl implements ProductService {
     private ProductMapper productMapper;
 
     @Override
-    @Transactional
     public void addProduct(Product product) {
         validateProduct(product);
+        validateUniqueName(product);
+        
         productMapper.insertProduct(product);
     }
     
@@ -31,6 +32,7 @@ public class ProductServiceImpl implements ProductService {
         if (products.isEmpty()) {
             throw new ProductNotFoundException("No products found.");
         }
+        
         return products;
     }
 
@@ -39,77 +41,87 @@ public class ProductServiceImpl implements ProductService {
     public Product queryById(int id) {
         validateId(id);
         return productMapper.selectAllById(id)
-                .stream()		  		
-                .findFirst()
                 .orElseThrow(() -> new ProductNotFoundException("Product with id " + id + " not found"));
     }
 
 
     @Override
     public List<Product> queryByName(String name) {
-        validateString(name, "Name");
+        validateNonNullAndNonEmptyString(name, "Name");
         List<Product> products = productMapper.selectAllByName(name);
         if (products.isEmpty()) {
             throw new ProductNotFoundException("No products found with name: " + name);
         }
+        
         return products;
     }
 
     @Override
     public List<Product> queryByModel(String model) {
-        validateString(model, "Model");
+        validateNonNullAndNonEmptyString(model, "Model");
         List<Product> products = productMapper.selectAllByModel(model);
         if (products.isEmpty()) {
             throw new ProductNotFoundException("No products found with model: " + model);
         }
+        
         return products;
     }
 
     @Override
-    @Transactional
     public void updateProduct(Product product) {
-        if (product == null) {
-            throw new IllegalArgumentException("Product cannot be null");
-        }
-        validateId(product.getId());
         validateProduct(product);
-        if (productMapper.selectAllById(product.getId()).isEmpty()) {
-            throw new ProductNotFoundException("Product with id " + product.getId() + " not found");
-        }
+        validateId(product.getId());
+        ensureProductExists(product.getId());
+        validateUniqueName(product);
+        
         productMapper.updateProduct(product);
     }
     
     @Override
-    @Transactional
     public void deleteById(int id) {
         validateId(id);
-        if (productMapper.selectAllById(id).isEmpty()) {
-            throw new ProductNotFoundException("Product with id " + id + " not found");
-        }
+        ensureProductExists(id);
+        
         productMapper.deleteById(id);
     }
     
     
     
     
+    
+    
     private void validateProduct(Product product) {
         if (product == null || isProductDataInvalid(product)) {
-            throw new IllegalArgumentException("Product data is invalid");
+            throw new InvalidProductDataException("Product data is invalid");
         }
     }
 
+    private static final int MIN_VALID_ID = 1;
     private void validateId(int id) {
-        if (id <= 0) {
-            throw new IllegalArgumentException("ID must be a positive number");
+        if (id < MIN_VALID_ID) {
+            throw new InvalidProductDataException("ID must be a positive number");
+        }
+    }
+    
+    private void ensureProductExists(int id) {
+        if (productMapper.selectAllById(id).isEmpty()) {
+            throw new ProductNotFoundException("Product with id " + id + " not found");
         }
     }
 
-    private void validateString(String value, String fieldName) {
+
+    private void validateNonNullAndNonEmptyString(String value, String fieldName) {
         if (value == null || value.isEmpty()) {
-            throw new IllegalArgumentException(fieldName + " cannot be null or empty");
+            throw new InvalidProductDataException(fieldName + " cannot be null or empty");
         }
     }
 
+    private void validateUniqueName(Product product) {
+    	if (productMapper.countByName(product.getName()) > 0) {
+    		throw new InvalidProductDataException(product.getName() + " already exists");
+    	}
+    }
+    
 	private boolean isProductDataInvalid(Product product) {
         String name = product.getName();
         String model = product.getModel();
